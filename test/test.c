@@ -161,6 +161,5 @@ Test(my_secmalloc, realloc_to_smaller_size) {
 
     int *new_ptr = my_realloc(ptr, 5 * sizeof(int));
     cr_assert_not_null(new_ptr, "my_realloc(ptr, 5 * sizeof(int)) a retourné NULL.");
-
     my_free(new_ptr);
 }

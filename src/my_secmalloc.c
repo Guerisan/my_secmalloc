@@ -12,7 +12,6 @@
 #include "my_secmalloc.h"
 #include "my_secmalloc_private.h"
 
-
 /*static*/ void *pool_data = 0;
 /*static*/ struct dmem *pool_meta = 0;
 /*static */size_t size_pool_data = 1024*1024;
@@ -97,7 +96,7 @@ void    dmem_init(size_t idx, size_t sz )
   dm->full = sz + sizeof (size_t);
   dm->busy = 1;
   // Nettoie la mémoire
-  memset(dm->data, 0, dm->sz);
+  memset(dm->data, 0, dm->full);
   // Remplis le canary
   for (size_t i = 0; i < sizeof (size_t); i++) {
     dm->data[dm->sz + i] = 'X';
@@ -182,8 +181,8 @@ void    my_free(void *ptr)
   }
   
   // Check de l'intégrité du canary
-  for (size_t i = 0; i <= (pool_meta[idx].full - pool_meta[idx].sz); i++) {
-    if (pool_meta[idx].data[pool_meta[idx].sz + i] != 'X')
+  for (size_t i = 0; i < sizeof (size_t); i++) {
+    if (pool_meta[idx].data[pool_meta[idx].sz + i] != (char)('X'))
     {
       my_log("Canary compromis à size + %d\n", i);
       return;
@@ -278,17 +277,22 @@ void    *my_realloc(void *ptr, size_t size)
 
 
     // Version avem mremap:
-    // Redimensionner le bloc de mémoire avec mremap
     void *new_ptr = mremap(ptr, pool_meta[idx].sz, size, MREMAP_MAYMOVE);
     if (new_ptr == MAP_FAILED) {
         // Si mremap échoue, retourner NULL
         return NULL;
     }
 
-    // Mettre à jour les métadonnées pour refléter la nouvelle taille
+    // Mise à jour des métadonnées
     pool_meta[idx].sz = size;
+    pool_meta[idx].full = size + sizeof(size_t);
     pool_meta[idx].data = new_ptr;
-    my_log("reallocated");
+    // Restauration du canary
+    for (size_t i = 0; i < sizeof (size_t); i++) {
+      pool_meta[idx].data[pool_meta[idx].sz + i] = 'X';
+    }
+
+    my_log("reallocated\n");
     // Retourner le pointeur vers le nouvel espace mémoire
     return new_ptr;
 }
